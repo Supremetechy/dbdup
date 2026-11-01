@@ -1,0 +1,121 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Architecture {
+  id          String        @id @default(cuid())
+  name        String
+  tags        String[]      @default([])
+  ownerId     String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  components  Component[]
+  connections Connection[]
+  explanation Explanation?
+
+  simulations SimulationResult[]
+}
+
+model Component {
+  id        String   @id @default(cuid())
+  name      String
+  kind      String   // ArchitectureComponentKind
+  tags      String[] @default([])
+  description String?
+
+  // Simulation fields
+  capacityRps        Int?
+  baseLatencyMs      Int?
+  isCrashed          Boolean? @default(false)
+  capacityMultiplier Float?   @default(1)
+  latencySpikeMultiplier Float? @default(1)
+
+  architecture Architecture @relation(fields: [architectureId], references: [id])
+  architectureId String
+}
+
+model Connection {
+  id        String   @id @default(cuid())
+  sourceId  String
+  targetId  String
+  protocol  String?
+  description String?
+  isDisabled Boolean? @default(false)
+
+  architecture Architecture @relation(fields: [architectureId], references: [id])
+  architectureId String
+}
+
+model Explanation {
+  id          String     @id @default(cuid())
+  summary     String
+  risks       String[]
+  improvements String[]
+  flows       String[]
+
+  architecture Architecture @relation(fields: [architectureId], references: [id])
+  architectureId String
+
+  patterns Pattern[]
+}
+
+model Pattern {
+  id          String   @id @default(cuid())
+  type        String   // ArchitecturePatternType
+  description String
+
+  explanation Explanation @relation(fields: [explanationId], references: [id])
+  explanationId String
+}
+
+//
+// Optional: Simulation storage
+//
+
+model SimulationResult {
+  id             String          @id @default(cuid())
+  architecture   Architecture    @relation(fields: [architectureId], references: [id])
+  architectureId String
+
+  baseRps        Int
+  durationSeconds Int
+  defaultCapacityRps Int
+  defaultLatencyMs Int
+  enableJitter   Boolean
+  jitterAmplitudeRps Int?
+  jitterPeriodSeconds Int?
+
+  timeline SimulationTick[]
+}
+
+model SimulationTick {
+  id        String   @id @default(cuid())
+  time      Int
+
+  simulation SimulationResult @relation(fields: [simulationId], references: [id])
+  simulationId String
+
+  metrics ComponentMetrics[]
+}
+
+model ComponentMetrics {
+  id        String   @id @default(cuid())
+  componentId String
+  name      String
+  kind      String
+  rps       Float
+  saturation Float
+  latencyMs Float
+  errorRate Float
+
+  tick SimulationTick @relation(fields: [tickId], references: [id])
+  tickId String
+}
